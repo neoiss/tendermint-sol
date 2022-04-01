@@ -1,4 +1,5 @@
 {
+  "name": "tendermint-sol",
   "dependencies": {
     "@celo/contractkit": "^1.4.0",
     "@hyperledger-labs/yui-ibc-solidity": "git+https://github.com/hyperledger-labs/yui-ibc-solidity.git#1449d800e41331d8994a33aacd026aa7b7b9176b",
