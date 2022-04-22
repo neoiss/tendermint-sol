@@ -142,9 +142,9 @@ library Ops {
             return (empty, DoHashError.Sha512);
         }
         //require(hashOp != PROOFS_PROTO_GLOBAL_ENUMS.HashOp.Sha512_256); // dev: SHA512_256 not supported
-        if (hashOp == PROOFS_PROTO_GLOBAL_ENUMS.HashOp.SHA512_256) {
-            return (empty, DoHashError.Sha512_256);
-        }
+        //if (hashOp == PROOFS_PROTO_GLOBAL_ENUMS.HashOp.SHA512_256) {
+        //    return (empty, DoHashError.Sha512_256);
+        //}
         //revert(); // dev: Unsupported hashOp
         return (empty, DoHashError.Unsupported);
     }

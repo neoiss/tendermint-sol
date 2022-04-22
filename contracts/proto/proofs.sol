@@ -4641,8 +4641,7 @@ library PROOFS_PROTO_GLOBAL_ENUMS {
     SHA512,
     KECCAK,
     RIPEMD160,
-    BITCOIN,
-    SHA512_256
+    BITCOIN
   }
 
 
@@ -4671,10 +4670,6 @@ library PROOFS_PROTO_GLOBAL_ENUMS {
 
     if (x == HashOp.BITCOIN) {
       return 5;
-    }
-
-    if (x == HashOp.SHA512_256) {
-      return 6;
     }
     revert();
   }
@@ -4705,10 +4700,6 @@ library PROOFS_PROTO_GLOBAL_ENUMS {
 
     if (x == 5) {
       return HashOp.BITCOIN;
-    }
-
-    if (x == 6) {
-      return HashOp.SHA512_256;
     }
     revert();
   }

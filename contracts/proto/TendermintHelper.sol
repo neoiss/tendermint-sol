@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.2;
 
-import {TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS, Validator, CanonicalBlockID, CanonicalVote, TmHeader, ConsensusState, Commit, CommitSig, SignedHeader, ValidatorSet, Duration, Timestamp, Consensus} from "./TendermintLight.sol";
+import {TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS, Validator, CanonicalBlockID, CanonicalVote, TmHeader, ConsensusState, Commit, CommitSig, SignedHeader, ValidatorSet, Duration, Timestamp, Consensus, MerkleRoot} from "./TendermintLight.sol";
 import "./Encoder.sol";
 import "../utils/Bytes.sol";
 import "../utils/crypto/MerkleTree.sol";
@@ -20,7 +20,9 @@ library TendermintHelper {
         return
             ConsensusState.Data({
                 timestamp: tmHeader.signed_header.header.time,
-                merkle_root_hash: tmHeader.signed_header.header.app_hash,
+                root: MerkleRoot.Data({
+                    hash: tmHeader.signed_header.header.app_hash
+                }),
                 next_validators_hash: tmHeader.signed_header.header.next_validators_hash
             });
     }

@@ -1,6 +1,7 @@
 syntax = "proto3";
 package tendermint.light;
 
+import "ics23/proofs.proto";
 import "client/Client.proto";
 
 message Fraction {
@@ -35,12 +36,26 @@ message ClientState {
   Height frozen_height = 6;
   // Latest height the client was updated to
   Height latest_height = 7;
+  // Proof specifications used in verifying counterparty state
+  repeated ProofSpec proof_specs = 8;
+  // Path at which next upgraded client will be committed.
+  // Each element corresponds to the key for a single CommitmentProof in the
+  // chained proof. NOTE: ClientState must stored under
+  // `{upgradePath}/{upgradeHeight}/clientState` ConsensusState must be stored
+  // under `{upgradepath}/{upgradeHeight}/consensusState` For SDK chains using
+  // the default upgrade module, upgrade_path should be []string{"upgrade",
+  // "upgradedIBCState"}`
+  repeated string upgrade_path = 9;
   // This flag, when set to true, will allow governance to recover a client
   // which has expired
-  bool allow_update_after_expiry = 8;
+  bool allow_update_after_expiry = 10;
   // This flag, when set to true, will allow governance to unfreeze a client
   // whose chain has experienced a misbehaviour event
-  bool allow_update_after_misbehaviour = 9;
+  bool allow_update_after_misbehaviour = 11;
+}
+
+message MerkleRoot {
+  bytes hash = 1;
 }
 
 // ConsensusState defines the consensus state from Tendermint.
@@ -50,7 +65,7 @@ message ConsensusState {
   Timestamp timestamp = 1;
 
   // commitment root (i.e app hash)
-  bytes merkle_root_hash = 2;
+  MerkleRoot root = 2;
   bytes next_validators_hash = 3;
 }
 

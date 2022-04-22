@@ -66,9 +66,9 @@ contract TendermintLightClient is IClient {
 
     constructor() public {
         _pts = ProtoTypes({
-            clientState: keccak256(abi.encodePacked("/tendermint.types.ClientState")),
-            consensusState: keccak256(abi.encodePacked("/tendermint.types.ConsensusState")),
-            tmHeader: keccak256(abi.encodePacked("/tendermint.types.TmHeader"))
+            clientState: keccak256(abi.encodePacked("/ibc.lightclients.tendermint.v1.ClientState")),
+            consensusState: keccak256(abi.encodePacked("/ibc.lightclients.tendermint.v1.ClientState")),
+            tmHeader: keccak256(abi.encodePacked("/tendermint.light.TmHeader"))
         });
     }
 
@@ -228,7 +228,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.merkle_root_hash.toBytes32(), prefix, IBCIdentifier.connectionCommitmentSlot(connectionId), keccak256(connectionBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.connectionCommitmentSlot(connectionId), keccak256(connectionBytes));
     }
 
     function verifyChannelState(
@@ -256,7 +256,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.merkle_root_hash.toBytes32(), prefix, IBCIdentifier.channelCommitmentSlot(portId, channelId), keccak256(channelBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.channelCommitmentSlot(portId, channelId), keccak256(channelBytes));
     }
 
     function verifyPacketCommitment(
@@ -290,7 +290,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.merkle_root_hash.toBytes32(), prefix, IBCIdentifier.packetCommitmentSlot(portId, channelId, sequence), commitmentBytes);
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.packetCommitmentSlot(portId, channelId, sequence), commitmentBytes);
     }
 
     function verifyPacketAcknowledgement(
@@ -313,7 +313,7 @@ contract TendermintLightClient is IClient {
         if (!validateDelayPeriod(host, clientId, height, delayPeriodTime, delayPeriodBlocks)) {
             return false;
         }
-        bytes32 stateRoot = mustGetConsensusState(host, clientId, height).merkle_root_hash.toBytes32();
+        bytes32 stateRoot = mustGetConsensusState(host, clientId, height).root.hash.toBytes32();
         bytes32 ackCommitmentSlot = IBCIdentifier.packetAcknowledgementCommitmentSlot(portId, channelId, sequence);
         bytes32 ackCommitment = host.makePacketAcknowledgementCommitment(acknowledgement);
         return verifyMembership(proof, stateRoot, prefix, ackCommitmentSlot, ackCommitment);
@@ -343,7 +343,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.merkle_root_hash.toBytes32(), prefix, IBCIdentifier.clientStateCommitmentSlot(counterpartyClientIdentifier), keccak256(clientStateBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.clientStateCommitmentSlot(counterpartyClientIdentifier), keccak256(clientStateBytes));
     }
 
     function verifyClientConsensusState(
@@ -371,7 +371,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.merkle_root_hash.toBytes32(), prefix, IBCIdentifier.consensusStateCommitmentSlot(counterpartyClientIdentifier, consensusHeight), keccak256(consensusStateBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.consensusStateCommitmentSlot(counterpartyClientIdentifier, consensusHeight), keccak256(consensusStateBytes));
     }
 
     function validateArgs(ClientState.Data memory cs, Height.Data memory height, bytes memory prefix, bytes memory proof) internal pure returns (bool) {
@@ -445,14 +445,14 @@ contract TendermintLightClient is IClient {
 
     function marshalClientState(ClientState.Data memory clientState) internal pure returns (bytes memory) {
         Any.Data memory anyClientState;
-        anyClientState.type_url = "/tendermint.types.ClientState";
+        anyClientState.type_url = "/ibc.lightclients.tendermint.v1.ClientState";
         anyClientState.value = ClientState.encode(clientState);
         return Any.encode(anyClientState);
     }
 
     function marshalConsensusState(ConsensusState.Data memory consensusState) internal pure returns (bytes memory) {
         Any.Data memory anyConsensusState;
-        anyConsensusState.type_url = "/tendermint.types.ConsensusState";
+        anyConsensusState.type_url = "/ibc.lightclients.tendermint.v1.ConsensusState";
         anyConsensusState.value = ConsensusState.encode(consensusState);
         return Any.encode(anyConsensusState);
     }
