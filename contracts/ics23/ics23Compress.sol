@@ -6,51 +6,83 @@ import {InnerOp, ExistenceProof, NonExistenceProof, CommitmentProof, CompressedB
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 library Compress {
-    function decompress(CommitmentProof.Data memory proof) internal pure returns(CommitmentProof.Data memory) {
+    /**
+      @notice will return a BatchProof if the input is CompressedBatchProof. Otherwise it will return the input.
+      This is safe to call multiple times (idempotent)
+    */
+    function decompress(
+        CommitmentProof.Data memory proof
+    ) internal pure returns(CommitmentProof.Data memory, DecompressEntryError) {
         //CompressedBatchProof.isNil() does not work
         if (CompressedBatchProof._empty(proof.compressed) == true){
-            return proof;
+            return (proof, DecompressEntryError.None);
         }
-        return CommitmentProof.Data({
-            exist: ExistenceProof.nil(),
-            nonexist: NonExistenceProof.nil(),
-            batch: BatchProof.Data({
-                entries: decompress(proof.compressed)
-            }),
-            compressed: CompressedBatchProof.nil()
-        });
+        (BatchEntry.Data[] memory entries, DecompressEntryError erCode) = decompress(proof.compressed);
+        if (erCode != DecompressEntryError.None) return (CommitmentProof.nil(), erCode);
+        CommitmentProof.Data memory retVal;
+        retVal.exist = ExistenceProof.nil();
+        retVal.nonexist = NonExistenceProof.nil();
+        retVal.compressed = CompressedBatchProof.nil();
+        retVal.batch.entries = entries;
+        return (retVal, DecompressEntryError.None);
     }
 
-    // private 
-    function decompress(CompressedBatchProof.Data memory proof) private pure returns(BatchEntry.Data[] memory) {
+    function decompress(
+        CompressedBatchProof.Data memory proof
+    ) private pure returns(BatchEntry.Data[] memory, DecompressEntryError) {
         BatchEntry.Data[] memory entries = new BatchEntry.Data[](proof.entries.length);
         for(uint i = 0; i < proof.entries.length; i++) {
-            entries[i] = decompressEntry(proof.entries[i], proof.lookup_inners);
+            (BatchEntry.Data memory entry, DecompressEntryError erCode) = decompressEntry(proof.entries[i], proof.lookup_inners);
+            if (erCode != DecompressEntryError.None) return (entries, erCode);
+            entries[i] = entry;
         }
-        return entries;
+        return (entries, DecompressEntryError.None);
     }
 
-    function decompressEntry(CompressedBatchEntry.Data memory entry, InnerOp.Data[] memory lookup) private pure returns(BatchEntry.Data memory) {
+    enum DecompressEntryError{
+        None,
+        ExistDecompress,
+        LeftDecompress,
+        RightDecompress
+    }
+    function decompressEntry(
+        CompressedBatchEntry.Data memory entry,
+        InnerOp.Data[] memory lookup
+    ) private pure returns(BatchEntry.Data memory, DecompressEntryError) {
         //CompressedExistenceProof.isNil does not work
         if (CompressedExistenceProof._empty(entry.exist) == false) {
-            return BatchEntry.Data({
-                exist: decompressExist(entry.exist, lookup),
+            (ExistenceProof.Data memory exist, DecompressExistError existErCode) = decompressExist(entry.exist, lookup);
+            if (existErCode != DecompressExistError.None) return(BatchEntry.nil(), DecompressEntryError.ExistDecompress);
+            return (BatchEntry.Data({
+                exist: exist,
                 nonexist: NonExistenceProof.nil()
-            });
+            }), DecompressEntryError.None);
         }
-        return BatchEntry.Data({
+        (ExistenceProof.Data memory left, DecompressExistError leftErCode) = decompressExist(entry.nonexist.left, lookup);
+        if (leftErCode != DecompressExistError.None) return(BatchEntry.nil(), DecompressEntryError.LeftDecompress);
+        (ExistenceProof.Data memory right, DecompressExistError rightErCode) = decompressExist(entry.nonexist.right, lookup);
+        if (rightErCode != DecompressExistError.None) return(BatchEntry.nil(), DecompressEntryError.RightDecompress);
+        return (BatchEntry.Data({
             exist: ExistenceProof.nil(),
             nonexist: NonExistenceProof.Data({
                 key: entry.nonexist.key,
-                left: decompressExist(entry.nonexist.left, lookup),
-                right: decompressExist(entry.nonexist.right, lookup)
+                left: left,
+                right: right
             })
-        });
+        }), DecompressEntryError.None);
     }
 
-    function decompressExist(CompressedExistenceProof.Data memory proof, InnerOp.Data[] memory lookup) private pure returns(ExistenceProof.Data memory) {
+    enum DecompressExistError{
+        None,
+        PathLessThanZero,
+        StepGreaterOrEqualToLength
+    }
+    function decompressExist(
+        CompressedExistenceProof.Data memory proof,
+        InnerOp.Data[] memory lookup
+    ) private pure returns(ExistenceProof.Data memory, DecompressExistError) {
         if (CompressedExistenceProof._empty(proof)) {
-            return ExistenceProof.nil();
+            return (ExistenceProof.nil(), DecompressExistError.None);
         }
         ExistenceProof.Data memory decoProof = ExistenceProof.Data({
             key: proof.key,
@@ -59,11 +91,13 @@ library Compress {
             path : new InnerOp.Data[](proof.path.length)
         });
         for (uint i = 0; i < proof.path.length; i++) {
-            require(proof.path[i] >= 0); // dev: proof.path < 0
+            //require(proof.path[i] >= 0); // dev: proof.path < 0
+            if (proof.path[i] < 0) return (ExistenceProof.nil(), DecompressExistError.PathLessThanZero);
             uint step = SafeCast.toUint256(proof.path[i]);
-            require(step < lookup.length); // dev: step >= lookup.length
+            //require(step < lookup.length); // dev: step >= lookup.length
+            if (step >= lookup.length) return (ExistenceProof.nil(), DecompressExistError.StepGreaterOrEqualToLength);
             decoProof.path[i] = lookup[step];
         }
-        return decoProof;
+        return (decoProof, DecompressExistError.None);
     }
 }

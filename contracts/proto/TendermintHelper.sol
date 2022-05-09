@@ -20,14 +20,16 @@ library TendermintHelper {
         return
             ConsensusState.Data({
                 timestamp: tmHeader.signed_header.header.time,
-                root: MerkleRoot.Data({
-                    hash: tmHeader.signed_header.header.app_hash
-                }),
+                root: MerkleRoot.Data({hash: tmHeader.signed_header.header.app_hash}),
                 next_validators_hash: tmHeader.signed_header.header.next_validators_hash
             });
     }
 
-    function toCanonicalVote(Commit.Data memory commit, uint256 valIdx, string memory chainID) internal pure returns (CanonicalVote.Data memory) {
+    function toCanonicalVote(
+        Commit.Data memory commit,
+        uint256 valIdx,
+        string memory chainID
+    ) internal pure returns (CanonicalVote.Data memory) {
         CommitSig.Data memory commitSig = commit.signatures[valIdx];
 
         return

@@ -280,7 +280,7 @@ library Tendermint {
         string memory chainID,
         uint256 idx
     ) internal pure returns (bytes memory) {
-        return (CanonicalVote.encode(commit.toCanonicalVote(idx,chainID)));
+        return (CanonicalVote.encode(commit.toCanonicalVote(idx, chainID)));
     }
 
     function voteSignBytesDelim(

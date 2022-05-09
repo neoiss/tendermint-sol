@@ -7,7 +7,6 @@ import {Ops} from "./ics23Ops.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BytesLib} from "solidity-bytes-utils/contracts/BytesLib.sol";
 import {Compress} from "./ics23Compress.sol";
-import {Ops} from "./ics23Ops.sol";
 
 library Proof{
     bytes constant empty = new bytes(0);
@@ -20,15 +19,24 @@ library Proof{
         CalculateRoot,
         RootNotMatching
     }
-    // ExistenceProof
-    function verify(ExistenceProof.Data memory proof, ProofSpec.Data memory spec, bytes memory commitmentRoot,bytes memory key, bytes memory value) internal pure returns(VerifyExistenceError) {
+    /**
+    @notice verify does all checks to ensure this proof proves this key, value -> root and matches the spec.
+    @return VerifyExistenceError enum giving indication of where error happened, None if verification succeded
+        */
+    function verify(
+        ExistenceProof.Data memory proof,
+        ProofSpec.Data memory spec,
+        bytes memory commitmentRoot,
+        bytes memory key,
+        bytes memory value
+    ) internal pure returns(VerifyExistenceError) {
         //require(BytesLib.equal(proof.key, key)); // dev: Provided key doesn't match proof
         bool keyMatch = BytesLib.equal(proof.key, key);
         if (keyMatch == false) return VerifyExistenceError.KeyNotMatching;
         //require(BytesLib.equal(proof.value, value)); // dev: Provided value doesn't match proof
         bool valueMatch = BytesLib.equal(proof.value, value);
         if (valueMatch == false) return VerifyExistenceError.ValueNotMatching;
-        CheckAgainstSpecError cCode =  checkAgainstSpec(proof, spec);
+        CheckAgainstSpecError cCode = checkAgainstSpec(proof, spec);
         if (cCode != CheckAgainstSpecError.None) return VerifyExistenceError.CheckSpec;
         (bytes memory root, CalculateRootError rCode) = calculateRoot(proof);
         if (rCode != CalculateRootError.None) return VerifyExistenceError.CalculateRoot;
@@ -46,8 +54,13 @@ library Proof{
         PathOp,
         BatchEntriesLength,
         BatchEntryEmpty,
-        EmptyProof
+        EmptyProof,
+        Decompress
     }
+    /**
+    @notice calculateRoot determines the root hash that matches the given proof. You must validate the result in what you have in a header.
+    @return CalculateRootError enum giving indication of where error happened, None if verification succeded
+        */
     function calculateRoot(ExistenceProof.Data memory proof) internal pure returns(bytes memory, CalculateRootError) {
         //require(LeafOp.isNil(proof.leaf) == false); // dev: Existence Proof needs defined LeafOp
         if (LeafOp.isNil(proof.leaf)) return (empty, CalculateRootError.LeafNil);
@@ -69,7 +82,14 @@ library Proof{
         InnerOpsDepthTooShort,
         InnerOpsDepthTooLong
     }
-    function checkAgainstSpec(ExistenceProof.Data memory proof, ProofSpec.Data memory spec) internal pure returns(CheckAgainstSpecError) {
+    /**
+    @notice checkAgainstSpec will verify the leaf and all path steps are in the format defined in spec
+    @return CheckAgainstSpecError enum giving indication of where error happened, None if verification succeded
+        */
+    function checkAgainstSpec(
+        ExistenceProof.Data memory proof,
+        ProofSpec.Data memory spec
+    ) internal pure returns(CheckAgainstSpecError) {
         // LeafOp.isNil does not work
         //require(LeafOp._empty(proof.leaf) == false); // dev: Existence Proof needs defined LeafOp
         if (LeafOp._empty(proof.leaf)) return CheckAgainstSpecError.EmptyLeaf;
@@ -86,8 +106,8 @@ library Proof{
             if (innerOpsDepthTooLong) return CheckAgainstSpecError.InnerOpsDepthTooLong;
         }
         for(uint i = 0; i < proof.path.length; i++) {
-            Ops.CheckAgainstSpecError cCode = Ops.checkAgainstSpec(proof.path[i], spec);
-            if (cCode != Ops.CheckAgainstSpecError.None) return CheckAgainstSpecError.OpsCheckAgainstSpec;
+            Ops.CheckAgainstSpecError opscCode = Ops.checkAgainstSpec(proof.path[i], spec);
+            if (opscCode != Ops.CheckAgainstSpecError.None) return CheckAgainstSpecError.OpsCheckAgainstSpec;
         }
     }
 
@@ -102,8 +122,17 @@ library Proof{
         LeftProofRightMost,
         IsLeftNeighbor
     }
-    // NonExistenceProof
-    function verify(NonExistenceProof.Data memory proof, ProofSpec.Data memory spec, bytes memory commitmentRoot,bytes memory key) internal pure returns(VerifyNonExistenceError) {
+    /**
+    @notice verify does all checks to ensure the proof has valid non-existence proofs,
+    and they ensure the given key is not in the CommitmentState
+    @return VerifyNonExistenceError enum giving indication of where error happened, None if verification succeded
+        */
+    function verify(
+        NonExistenceProof.Data memory proof,
+        ProofSpec.Data memory spec,
+        bytes memory commitmentRoot,
+        bytes memory key
+    ) internal pure returns(VerifyNonExistenceError) {
         bytes memory leftKey;
         bytes memory rightKey;
         // ExistenceProof.isNil does not work
@@ -146,6 +175,10 @@ library Proof{
         return VerifyNonExistenceError.None;
     }
 
+    /**
+    @notice calculateRoot determines the root hash that matches the given proof. You must validate the result in what you have in a header.
+    @return CalculateRootError enum giving indication of where error happened, None if verification succeded
+        */
     function calculateRoot(NonExistenceProof.Data memory proof) internal pure returns(bytes memory, CalculateRootError) {
         if (ExistenceProof._empty(proof.left) == false) {
             return calculateRoot(proof.left);
@@ -157,7 +190,12 @@ library Proof{
         return (empty, CalculateRootError.EmptyProof);
     }
 
-    // commitment proof
+    /**
+    @notice calculateRoot determines the root hash that matches the given proof by switching and calculating root based on proof type
+    NOTE: Calculate will return the first calculated root in the proof, you must validate that all other embedded ExistenceProofs
+    commit to the same root. This can be done with the Verify method
+    @return CalculateRootError enum giving indication of where error happened, None if verification succeded
+        */
     function calculateRoot(CommitmentProof.Data memory proof) internal pure returns(bytes memory, CalculateRootError) {
         if (ExistenceProof._empty(proof.exist) == false) {
             return calculateRoot(proof.exist);
@@ -178,14 +216,18 @@ library Proof{
             }
         }
         if (CompressedBatchProof._empty(proof.compressed) == false) {
-            return calculateRoot(Compress.decompress(proof));
+            (CommitmentProof.Data memory proof, Compress.DecompressEntryError erCode) = Compress.decompress(proof);
+            if (erCode != Compress.DecompressEntryError.None) return (empty, CalculateRootError.Decompress);
+            return calculateRoot(proof);
         }
         //revert(); // dev: calculateRoot(CommitmentProof) empty proof
         return (empty, CalculateRootError.EmptyProof);
     }
 
 
-    // private
+    /**
+    @return true if this is the left-most path in the tree
+    */
     function isLeftMost(InnerSpec.Data memory spec, InnerOp.Data[] memory path) private pure returns(bool) {
         (uint minPrefix, uint maxPrefix, uint suffix, GetPaddingError gCode) = getPadding(spec, 0);
         if (gCode != GetPaddingError.None) return false;
@@ -197,6 +239,9 @@ library Proof{
         return true;
     }
 
+    /**
+    @return true if this is the right-most path in the tree
+    */
     function isRightMost(InnerSpec.Data memory spec, InnerOp.Data[] memory path) private pure returns(bool){
         uint last = spec.child_order.length - 1;
         (uint minPrefix, uint maxPrefix, uint suffix, GetPaddingError gCode) = getPadding(spec, last);
@@ -210,7 +255,14 @@ library Proof{
         return true;
     }
 
-    function isLeftStep(InnerSpec.Data memory spec, InnerOp.Data memory left, InnerOp.Data memory right) private pure returns(bool){
+    /**
+    @notice assumes left and right have common parents checks if left is exactly one slot to the left of right
+    */
+    function isLeftStep(
+        InnerSpec.Data memory spec,
+        InnerOp.Data memory left,
+        InnerOp.Data memory right
+    ) private pure returns(bool){
         (uint leftIdx, OrderFromPaddingError lCode) = orderFromPadding(spec, left);
         if (lCode != OrderFromPaddingError.None) return false;
         (uint rightIdx, OrderFromPaddingError rCode) = orderFromPadding(spec, right);
@@ -220,7 +272,17 @@ library Proof{
         return rightIdx == leftIdx + 1;
     }
 
-    function isLeftNeighbor(InnerSpec.Data memory spec, InnerOp.Data[] memory left, InnerOp.Data[] memory right) private pure returns(bool) {
+    /**
+    @notice find the common suffix from the Left.Path and Right.Path and remove it. We have LPath and RPath now, which must be neighbors.
+    Validate that LPath[len-1] is the left neighbor of RPath[len-1]
+    For step in LPath[0..len-1], validate step is right-most node
+    For step in RPath[0..len-1], validate step is left-most node
+     */
+    function isLeftNeighbor(
+        InnerSpec.Data memory spec,
+        InnerOp.Data[] memory left,
+        InnerOp.Data[] memory right
+    ) private pure returns(bool) {
         uint leftIdx = left.length - 1;
         uint rightIdx = right.length - 1;
         while (leftIdx >= 0 && rightIdx >= 0) {
@@ -250,7 +312,13 @@ library Proof{
         NotFound,
         GetPadding
     }
-    function orderFromPadding(InnerSpec.Data memory spec, InnerOp.Data memory op) private pure returns(uint, OrderFromPaddingError) {
+    /**
+    @notice this will look at the proof and determine which order it is... So we can see if it is branch 0, 1, 2 etc... to determine neighbors
+    */
+    function orderFromPadding(
+        InnerSpec.Data memory spec,
+        InnerOp.Data memory op
+    ) private pure returns(uint, OrderFromPaddingError) {
         uint256 maxBranch = spec.child_order.length;
         for(uint branch = 0; branch < maxBranch; branch++) {
             (uint minp, uint maxp, uint suffix, GetPaddingError gCode) = getPadding(spec, branch);
@@ -265,7 +333,13 @@ library Proof{
         None,
         GetPosition
     }
-    function getPadding(InnerSpec.Data memory spec, uint branch) private pure returns(uint minPrefix, uint maxPrefix, uint suffix, GetPaddingError) {
+    /**
+    @notice determines prefix and suffix with the given spec and position in the tree
+    */
+    function getPadding(
+        InnerSpec.Data memory spec,
+        uint branch
+    ) private pure returns(uint minPrefix, uint maxPrefix, uint suffix, GetPaddingError) {
         uint uChildSize = SafeCast.toUint256(spec.child_size);
         (uint idx, GetPositionError gCode) = getPosition(spec.child_order, branch);
         if (gCode != GetPositionError.None) return (0, 0, 0, GetPaddingError.GetPosition);
@@ -282,6 +356,10 @@ library Proof{
         BranchLength,
         NoFound
     }
+    /**
+    @notice checks where the branch is in the order and returns the index of this branch
+    @return GetPositionError enum giving indication of where error happened, None if verification succeded
+        */
     function getPosition(int32[] memory order, uint branch) private pure returns(uint, GetPositionError) {
         //require(branch < order.length); // dev: invalid branch
         if (branch >= order.length) return (0, GetPositionError.BranchLength);
@@ -298,6 +376,9 @@ library Proof{
         return op.suffix.length == suffix;
     }
 
+    /**
+    @return a slice of of InnerOp.Data, array[start..end]
+    */
     function sliceInnerOps(InnerOp.Data[] memory array, uint start, uint end) private pure returns(InnerOp.Data[] memory) {
         InnerOp.Data[] memory slice = new InnerOp.Data[](end-start);
         for (uint i = start; i < end; i++) {

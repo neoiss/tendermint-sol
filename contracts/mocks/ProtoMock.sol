@@ -6,7 +6,6 @@ import {TmHeader} from "../proto/TendermintLight.sol";
 import {GoogleProtobufAny as Any} from "@hyperledger-labs/yui-ibc-solidity/contracts/core/types/GoogleProtobufAny.sol";
 
 contract ProtoMock {
-
     function unmarshalHeader(bytes memory headerBytes, string memory chainID) public {
         Any.Data memory anyHeader = Any.decode(headerBytes);
         TmHeader.Data memory header = TmHeader.decode(anyHeader.value);

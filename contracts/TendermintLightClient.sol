@@ -21,12 +21,12 @@ import {GoogleProtobufAny as Any} from "@hyperledger-labs/yui-ibc-solidity/contr
 import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IClient.sol";
 import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IBCHost.sol";
 import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IBCMsgs.sol";
-import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IBCIdentifier.sol";
 import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IBCHeight.sol";
 import "@hyperledger-labs/yui-ibc-solidity/contracts/core/types/Client.sol";
 import "./utils/Bytes.sol";
 import "./utils/Tendermint.sol";
 import "./ics23/ics23.sol";
+import "./Identifier.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract TendermintLightClient is IClient {
@@ -228,7 +228,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.connectionCommitmentSlot(connectionId), keccak256(connectionBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.connectionKey(connectionId), keccak256(connectionBytes));
     }
 
     function verifyChannelState(
@@ -256,7 +256,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.channelCommitmentSlot(portId, channelId), keccak256(channelBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.channelKey(portId, channelId), keccak256(channelBytes));
     }
 
     function verifyPacketCommitment(
@@ -290,7 +290,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.packetCommitmentSlot(portId, channelId, sequence), commitmentBytes);
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.packetCommitmentKey(portId, channelId, sequence), commitmentBytes);
     }
 
     function verifyPacketAcknowledgement(
@@ -314,9 +314,9 @@ contract TendermintLightClient is IClient {
             return false;
         }
         bytes32 stateRoot = mustGetConsensusState(host, clientId, height).root.hash.toBytes32();
-        bytes32 ackCommitmentSlot = IBCIdentifier.packetAcknowledgementCommitmentSlot(portId, channelId, sequence);
+        bytes memory ackCommitmentKey = Identifier.packetAcknowledgementCommitmentKey(portId, channelId, sequence);
         bytes32 ackCommitment = host.makePacketAcknowledgementCommitment(acknowledgement);
-        return verifyMembership(proof, stateRoot, prefix, ackCommitmentSlot, ackCommitment);
+        return verifyMembership(proof, stateRoot, prefix, ackCommitmentKey, ackCommitment);
     }
 
     function verifyClientState(
@@ -343,7 +343,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.clientStateCommitmentSlot(counterpartyClientIdentifier), keccak256(clientStateBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.clientStateKey(counterpartyClientIdentifier), keccak256(clientStateBytes));
     }
 
     function verifyClientConsensusState(
@@ -371,7 +371,7 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, IBCIdentifier.consensusStateCommitmentSlot(counterpartyClientIdentifier, consensusHeight), keccak256(consensusStateBytes));
+        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.consensusStateKey(counterpartyClientIdentifier, consensusHeight), keccak256(consensusStateBytes));
     }
 
     function validateArgs(ClientState.Data memory cs, Height.Data memory height, bytes memory prefix, bytes memory proof) internal pure returns (bool) {
@@ -493,12 +493,12 @@ contract TendermintLightClient is IClient {
         bytes memory proof,
         bytes32 root,
         bytes memory prefix,
-        bytes32 slot,
+        bytes memory key,
         bytes32 expectedValue
     ) internal view returns (bool) {
         CommitmentProof.Data memory commitmentProof = CommitmentProof.decode(proof);
 
-        Ics23.VerifyMembershipError vCode = Ics23.verifyMembership(_tmProofSpec, root.toBytes(), commitmentProof, slot.toBytes(), expectedValue.toBytes());
+        Ics23.VerifyMembershipError vCode = Ics23.verifyMembership(_tmProofSpec, root.toBytes(), commitmentProof, key, expectedValue.toBytes());
 
         return vCode == Ics23.VerifyMembershipError.None;
     }

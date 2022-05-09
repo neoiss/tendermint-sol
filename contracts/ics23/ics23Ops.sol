@@ -18,8 +18,15 @@ library Ops {
         DoHash,
         PrepareLeafData
     }
-    // LeafOp operations
-    function applyOp(LeafOp.Data memory leafOp, bytes memory key, bytes memory value) internal pure returns(bytes memory, ApplyLeafOpError) {
+    /**
+    @notice calculates the leaf hash given the key and value being proven
+    @return VerifyExistenceError enum giving indication of where error happened, None if verification succeded
+        */
+    function applyOp(
+        LeafOp.Data memory leafOp,
+        bytes memory key,
+        bytes memory value
+    ) internal pure returns(bytes memory, ApplyLeafOpError) {
         //require(key.length > 0); // dev: Leaf op needs key
         if (key.length == 0) return (empty, ApplyLeafOpError.KeyLength);
         //require(value.length > 0); // dev: Leaf op needs value
@@ -39,8 +46,11 @@ library Ops {
         DoHash,
         DoLengthOp
     }
-    // preapare leaf data for encoding
-    function prepareLeafData(PROOFS_PROTO_GLOBAL_ENUMS.HashOp hashOp, PROOFS_PROTO_GLOBAL_ENUMS.LengthOp lenOp, bytes memory data) internal pure returns(bytes memory, PrepareLeafDataError) {
+    function prepareLeafData(
+        PROOFS_PROTO_GLOBAL_ENUMS.HashOp hashOp,
+        PROOFS_PROTO_GLOBAL_ENUMS.LengthOp lenOp,
+        bytes memory data
+    ) internal pure returns(bytes memory, PrepareLeafDataError) {
         (bytes memory hased, DoHashError hCode) = doHashOrNoop(hashOp, data);
         if (hCode != DoHashError.None)return (empty, PrepareLeafDataError.DoHash);
         (bytes memory res, DoLengthOpError lCode) = doLengthOp(lenOp, hased);
@@ -59,7 +69,13 @@ library Ops {
         HasPrefix,
         MaxPrefixLength
     }
-    function checkAgainstSpec(LeafOp.Data memory leafOp, ProofSpec.Data memory spec) internal pure returns(CheckAgainstSpecError) {
+    /**
+    @notice will verify the LeafOp is in the format defined in spec
+    */
+    function checkAgainstSpec(
+        LeafOp.Data memory leafOp,
+        ProofSpec.Data memory spec
+    ) internal pure returns(CheckAgainstSpecError) {
         //require (leafOp.hash == spec.leaf_spec.hash); // dev: checkAgainstSpec for LeafOp - Unexpected HashOp
         if (leafOp.hash != spec.leaf_spec.hash) return CheckAgainstSpecError.Hash;
         //require(leafOp.prehash_key == spec.leaf_spec.prehash_key); // dev: checkAgainstSpec for LeafOp - Unexpected PrehashKey
@@ -80,7 +96,9 @@ library Ops {
         ChildLength,
         DoHash
     }
-    // InnerOp operations
+    /**
+    @notice apply will calculate the hash of the next step, given the hash of the previous step
+    */
     function applyOp(InnerOp.Data memory innerOp, bytes memory child ) internal pure returns(bytes memory, ApplyInnerOpError) {
         //require(child.length > 0); // dev: Inner op needs child value
         if (child.length == 0) return (empty, ApplyInnerOpError.ChildLength);
@@ -91,7 +109,13 @@ library Ops {
         return (hashed, ApplyInnerOpError.None);
     }
 
-    function checkAgainstSpec(InnerOp.Data memory innerOp, ProofSpec.Data memory spec) internal pure returns(CheckAgainstSpecError) {
+    /**
+    @notice will verify the InnerOp is in the format defined in spec
+    */
+    function checkAgainstSpec(
+        InnerOp.Data memory innerOp,
+        ProofSpec.Data memory spec
+    ) internal pure returns(CheckAgainstSpecError) {
         //require(innerOp.hash == spec.inner_spec.hash); // dev: checkAgainstSpec for InnerOp - Unexpected HashOp
         if (innerOp.hash != spec.inner_spec.hash) return CheckAgainstSpecError.Hash;
         uint256 minPrefixLength = SafeCast.toUint256(spec.inner_spec.min_prefix_length);
@@ -110,6 +134,9 @@ library Ops {
         return CheckAgainstSpecError.None;
     }
 
+    /**
+    @notice will return the preimage untouched if hashOp == NONE, otherwise, perform doHash
+    */
     function doHashOrNoop(PROOFS_PROTO_GLOBAL_ENUMS.HashOp hashOp, bytes memory preImage) internal pure returns(bytes memory, DoHashError) {
         if (hashOp == PROOFS_PROTO_GLOBAL_ENUMS.HashOp.NO_HASH) {
             return (preImage, DoHashError.None);
@@ -123,6 +150,9 @@ library Ops {
         Sha512_256,
         Unsupported
     }
+    /**
+    @notice will preform the specified hash on the preimage. If hashOp == NONE,
+     */
     function doHash(PROOFS_PROTO_GLOBAL_ENUMS.HashOp hashOp, bytes memory preImage) internal pure returns(bytes memory, DoHashError) {
         if (hashOp == PROOFS_PROTO_GLOBAL_ENUMS.HashOp.SHA256) {
             return (abi.encodePacked(sha256(preImage)), DoHashError.None);
@@ -174,6 +204,9 @@ library Ops {
         Require64DataLength,
         Unsupported
     }
+    /**
+      @notice will calculate the proper prefix and return it prepended doLengthOp(op, data) -> length(data) || data
+     */
     function doLengthOp(PROOFS_PROTO_GLOBAL_ENUMS.LengthOp lenOp, bytes memory data) private pure returns(bytes memory, DoLengthOpError) {
         if (lenOp == PROOFS_PROTO_GLOBAL_ENUMS.LengthOp.NO_PREFIX) {
             return (data, DoLengthOpError.None);

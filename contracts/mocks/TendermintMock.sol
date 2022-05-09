@@ -29,7 +29,7 @@ contract TendermintMock {
         return TendermintHelper.getByAddress(vs, addr);
     }
 
-    function getAddress(bytes memory data, uint index) public pure returns (bytes20 addr) {
+    function getAddress(bytes memory data, uint256 index) public pure returns (bytes20 addr) {
         ValidatorSet.Data memory vs = ValidatorSet.decode(data);
         return vs.validators[index].pub_key.toTmAddress();
     }

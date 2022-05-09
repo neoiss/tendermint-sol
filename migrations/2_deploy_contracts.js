@@ -21,6 +21,7 @@ function deployLightClient(deployer) {
 	const IBCHandler = artifacts.require("@hyperledger-labs/yui-ibc-solidity/IBCHandler");
 	const IBCMsgs = artifacts.require("@hyperledger-labs/yui-ibc-solidity/IBCMsgs");
 	const IBCIdentifier = artifacts.require("@hyperledger-labs/yui-ibc-solidity/IBCIdentifier");
+	const Identifier = artifacts.require("Identifier");
 	const TendermintLightClient = artifacts.require("TendermintLightClient");
 
 	// libs
@@ -40,6 +41,9 @@ function deployLightClient(deployer) {
 	});
 	deployer.deploy(IBCChannel).then(function() {
 	  return deployer.link(IBCChannel, [IBCHandler]);
+	});
+	deployer.deploy(Identifier).then(function() {
+		return deployer.link(Identifier, [TendermintLightClient]);
 	});
 
 	// TODO: truffle fails to deploy the library automatically,
