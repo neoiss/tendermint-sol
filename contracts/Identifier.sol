@@ -7,7 +7,7 @@ import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IBCHeight.sol";
 library Identifier {
     using IBCHeight for Height.Data;
 
-    bytes constant clientPrefix = "client";
+    bytes constant clientPrefix = "clients";
     bytes constant clientState = "clientState";
     bytes constant consensusPrefix = "consensusStates";
     bytes constant connectionPrefix = "connections";

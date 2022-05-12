@@ -6,7 +6,8 @@ import {
     ValidatorSet,
     ClientState,
     ConsensusState,
-    TmHeader
+    TmHeader,
+    MerkleProof
 } from "./proto/TendermintLight.sol";
 import {
     PROOFS_PROTO_GLOBAL_ENUMS,
@@ -26,6 +27,7 @@ import "@hyperledger-labs/yui-ibc-solidity/contracts/core/types/Client.sol";
 import "./utils/Bytes.sol";
 import "./utils/Tendermint.sol";
 import "./ics23/ics23.sol";
+import {Proof}  from "./ics23/ics23Proof.sol";
 import "./Identifier.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -228,7 +230,8 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.connectionKey(connectionId), keccak256(connectionBytes));
+        bytes[] memory path = applyPrefix(prefix, Identifier.connectionKey(connectionId));
+        return verifyMembership(clientState.proof_specs, proof, consensusState.root.hash, path, connectionBytes);
     }
 
     function verifyChannelState(
@@ -256,7 +259,8 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.channelKey(portId, channelId), keccak256(channelBytes));
+        bytes[] memory path = applyPrefix(prefix, Identifier.channelKey(portId, channelId));
+        return verifyMembership(clientState.proof_specs, proof, consensusState.root.hash, path, channelBytes);
     }
 
     function verifyPacketCommitment(
@@ -290,7 +294,8 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.packetCommitmentKey(portId, channelId, sequence), commitmentBytes);
+        bytes[] memory path = applyPrefix(prefix, Identifier.packetCommitmentKey(portId, channelId, sequence));
+        return verifyMembership(clientState.proof_specs, proof, consensusState.root.hash, path, commitmentBytes.toBytes());
     }
 
     function verifyPacketAcknowledgement(
@@ -313,10 +318,10 @@ contract TendermintLightClient is IClient {
         if (!validateDelayPeriod(host, clientId, height, delayPeriodTime, delayPeriodBlocks)) {
             return false;
         }
-        bytes32 stateRoot = mustGetConsensusState(host, clientId, height).root.hash.toBytes32();
-        bytes memory ackCommitmentKey = Identifier.packetAcknowledgementCommitmentKey(portId, channelId, sequence);
+        bytes memory stateRoot = mustGetConsensusState(host, clientId, height).root.hash;
+        bytes[] memory path = applyPrefix(prefix, Identifier.packetAcknowledgementCommitmentKey(portId, channelId, sequence));
         bytes32 ackCommitment = host.makePacketAcknowledgementCommitment(acknowledgement);
-        return verifyMembership(proof, stateRoot, prefix, ackCommitmentKey, ackCommitment);
+        return verifyMembership(clientState.proof_specs, proof, stateRoot, path, ackCommitment.toBytes());
     }
 
     function verifyClientState(
@@ -343,7 +348,8 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.clientStateKey(counterpartyClientIdentifier), keccak256(clientStateBytes));
+        bytes[] memory path = applyPrefix(prefix, Identifier.clientStateKey(counterpartyClientIdentifier));
+        return verifyMembership(clientState.proof_specs, proof, consensusState.root.hash, path, clientStateBytes);
     }
 
     function verifyClientConsensusState(
@@ -371,7 +377,8 @@ contract TendermintLightClient is IClient {
         if (!found) {
             return false;
         }
-        return verifyMembership(proof, consensusState.root.hash.toBytes32(), prefix, Identifier.consensusStateKey(counterpartyClientIdentifier, consensusHeight), keccak256(consensusStateBytes));
+        bytes[] memory path = applyPrefix(prefix, Identifier.consensusStateKey(counterpartyClientIdentifier, consensusHeight));
+        return verifyMembership(clientState.proof_specs, proof, consensusState.root.hash, path, consensusStateBytes);
     }
 
     function validateArgs(ClientState.Data memory cs, Height.Data memory height, bytes memory prefix, bytes memory proof) internal pure returns (bool) {
@@ -490,16 +497,55 @@ contract TendermintLightClient is IClient {
     }
 
     function verifyMembership(
+        ProofSpec.Data[] memory proofSpecs,
         bytes memory proof,
-        bytes32 root,
-        bytes memory prefix,
-        bytes memory key,
-        bytes32 expectedValue
+        bytes memory root,
+        bytes[] memory keys,
+        bytes memory expectedValue
     ) internal view returns (bool) {
-        CommitmentProof.Data memory commitmentProof = CommitmentProof.decode(proof);
+        MerkleProof.Data memory merkleProof = MerkleProof.decode(proof);
+        // proof cannot be empty
+        if (merkleProof.proofs.length == 0) {
+            return false;
+        }
+        if (proofSpecs.length != merkleProof.proofs.length) {
+            return false;
+        }
+        if (keys.length < proofSpecs.length) {
+            return false;
+        }
 
-        Ics23.VerifyMembershipError vCode = Ics23.verifyMembership(_tmProofSpec, root.toBytes(), commitmentProof, key, expectedValue.toBytes());
+        bytes memory subRoot;
+        bytes memory value = expectedValue;
+        for (uint i = 0; i < proofSpecs.length; i++) {
+            bool ok;
+            (subRoot, ok) = calculateRoot(merkleProof.proofs[i]);
+            if (!ok) {
+                return false;
+            }
+            Ics23.VerifyMembershipError vCode = Ics23.verifyMembership(proofSpecs[i], subRoot, merkleProof.proofs[i], keys[keys.length - 1 - i], value);
+            if (vCode != Ics23.VerifyMembershipError.None) {
+                return false;
+            }
+            value = subRoot;
+        }
+        return keccak256(root) == keccak256(subRoot);
+    }
 
-        return vCode == Ics23.VerifyMembershipError.None;
+    function calculateRoot(
+        CommitmentProof.Data memory proof
+    ) internal pure returns (bytes memory, bool) {
+        (bytes memory res, Proof.CalculateRootError eCode) = Proof.calculateRoot(proof);
+        return (res, eCode == Proof.CalculateRootError.None);
+    }
+
+    function applyPrefix(
+        bytes memory prefix,
+        bytes memory path
+    ) internal pure returns (bytes[] memory) {
+        bytes[] memory arr = new bytes[](2);
+        arr[0] = prefix;
+        arr[1] = path;
+        return arr;
     }
 }
