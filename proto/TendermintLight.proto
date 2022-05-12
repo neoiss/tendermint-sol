@@ -58,6 +58,10 @@ message MerkleRoot {
   bytes hash = 1;
 }
 
+message MerkleProof {
+  repeated CommitmentProof proofs = 1;
+}
+
 // ConsensusState defines the consensus state from Tendermint.
 message ConsensusState {
   // timestamp that corresponds to the block height in which the ConsensusState
