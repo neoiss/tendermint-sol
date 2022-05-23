@@ -46,27 +46,8 @@ contract TendermintLightClient is IClient {
     }
 
     ProtoTypes private _pts;
-    ProofSpec.Data private _tmProofSpec = ProofSpec.Data({
-        leaf_spec: LeafOp.Data({
-            hash: PROOFS_PROTO_GLOBAL_ENUMS.HashOp.SHA256,
-            prehash_key: PROOFS_PROTO_GLOBAL_ENUMS.HashOp.NO_HASH,
-            prehash_value: PROOFS_PROTO_GLOBAL_ENUMS.HashOp.SHA256,
-            length: PROOFS_PROTO_GLOBAL_ENUMS.LengthOp.VAR_PROTO,
-            prefix: hex"00"
-        }),
-        inner_spec: InnerSpec.Data({
-            child_order: getTmChildOrder(),
-            child_size: 32,
-            min_prefix_length: 1,
-            max_prefix_length: 1,
-            empty_child: abi.encodePacked(),
-            hash: PROOFS_PROTO_GLOBAL_ENUMS.HashOp.SHA256
-        }),
-        min_depth: 0,
-        max_depth: 0
-    });
 
-    constructor() public {
+    constructor() {
         _pts = ProtoTypes({
             clientState: keccak256(abi.encodePacked("/ibc.lightclients.tendermint.v1.ClientState")),
             consensusState: keccak256(abi.encodePacked("/ibc.lightclients.tendermint.v1.ClientState")),

@@ -7,6 +7,7 @@ import "../proto/TendermintHelper.sol";
 import "../proto/Encoder.sol";
 import "./crypto/Ed25519.sol";
 import "./Bytes.sol";
+import {BytesLib} from "solidity-bytes-utils/contracts/BytesLib.sol";
 
 library Tendermint {
     using Bytes for bytes;
@@ -271,8 +272,16 @@ library Tendermint {
         Validator.Data memory val,
         bytes memory message,
         bytes memory sig
-    ) internal view returns (bool) {
-        return Ed25519.verify(message, val.pub_key, sig);
+    ) internal pure returns (bool) {
+        require(sig.length == 64, "siganture length != 64");
+        require(val.pub_key.length == 32, "pubkey length != 32");
+        return
+            Ed25519.check(
+                val.pub_key.toBytes32(),
+                BytesLib.slice(sig, 0, 32).toBytes32(),
+                BytesLib.slice(sig, 32, 32).toBytes32(),
+                message
+            );
     }
 
     function voteSignBytes(
