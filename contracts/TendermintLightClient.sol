@@ -364,10 +364,13 @@ contract TendermintLightClient is IClient {
 
     function validateArgs(ClientState.Data memory cs, Height.Data memory height, bytes memory prefix, bytes memory proof) internal pure returns (bool) {
         if (cs.latest_height.lt(height)) {
+            revert("more then latest height");
             return false;
         } else if (prefix.length == 0) {
+            revert("prefix length is zero");
             return false;
         } else if (proof.length == 0) {
+            revert("proof length is zero");
             return false;
         }
         return true;
@@ -377,11 +380,13 @@ contract TendermintLightClient is IClient {
         uint64 currentTime = uint64(block.timestamp * 1000 * 1000 * 1000);
         uint64 validTime = mustGetProcessedTime(host, clientId, height) + delayPeriodTime;
         if (currentTime < validTime) {
+            revert("currentTime < validTime");
             return false;
         }
         uint64 currentHeight = uint64(block.number);
         uint64 validHeight = mustGetProcessedHeight(host, clientId, height) + delayPeriodBlocks;
         if (currentHeight < validHeight) {
+            revert("currentHeight < validHeight");
             return false;
         }
         return true;
@@ -487,12 +492,15 @@ contract TendermintLightClient is IClient {
         MerkleProof.Data memory merkleProof = MerkleProof.decode(proof);
         // proof cannot be empty
         if (merkleProof.proofs.length == 0) {
+            revert("merkleProof.proofs.length == 0");
             return false;
         }
         if (proofSpecs.length != merkleProof.proofs.length) {
+            revert("proofSpecs.length != merkleProof.proofs.length");
             return false;
         }
         if (keys.length < proofSpecs.length) {
+            revert("keys.length < proofSpecs.length");
             return false;
         }
 
@@ -502,10 +510,12 @@ contract TendermintLightClient is IClient {
             bool ok;
             (subRoot, ok) = calculateRoot(merkleProof.proofs[i]);
             if (!ok) {
+                revert("calculateRoot failed");
                 return false;
             }
             Ics23.VerifyMembershipError vCode = Ics23.verifyMembership(proofSpecs[i], subRoot, merkleProof.proofs[i], keys[keys.length - 1 - i], value);
             if (vCode != Ics23.VerifyMembershipError.None) {
+                revert("vCode != Ics23.VerifyMembershipError.None");
                 return false;
             }
             value = subRoot;
