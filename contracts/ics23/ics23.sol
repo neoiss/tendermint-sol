@@ -25,12 +25,21 @@ library Ics23  {
         bytes memory value
     ) internal pure returns(VerifyMembershipError){
         (CommitmentProof.Data memory decoProof, Compress.DecompressEntryError erCode) = Compress.decompress(proof);
-        if (erCode != Compress.DecompressEntryError.None) return VerifyMembershipError.Decompress;
+        if (erCode != Compress.DecompressEntryError.None) {
+            revert("erCode != Compress.DecompressEntryError.None");
+            return VerifyMembershipError.Decompress;
+        }
         ExistenceProof.Data memory exiProof = getExistProofForKey(decoProof, key);
         //require(Ics23ExistenceProof.isNil(exiProof) == false); // dev: getExistProofForKey not available
-        if (ExistenceProof.isNil(exiProof)) return VerifyMembershipError.ExistenceProofIsNil;
+        if (ExistenceProof.isNil(exiProof)) {
+            revert("ExistenceProof.isNil(exiProof)");
+            return VerifyMembershipError.ExistenceProofIsNil;
+        }
         Proof.VerifyExistenceError vCode = Proof.verify(exiProof, spec, commitmentRoot, key, value);
-        if (vCode != Proof.VerifyExistenceError.None) return VerifyMembershipError.ProofVerify;
+        if (vCode != Proof.VerifyExistenceError.None) {
+            revert("vCode != Proof.VerifyExistenceError.None");
+            return VerifyMembershipError.ProofVerify;
+        }
 
         return VerifyMembershipError.None;
     }
