@@ -15,6 +15,7 @@ library Compress {
     ) internal pure returns(CommitmentProof.Data memory, DecompressEntryError) {
         //CompressedBatchProof.isNil() does not work
         if (CompressedBatchProof._empty(proof.compressed) == true){
+            revert("CompressedBatchProof is empty");
             return (proof, DecompressEntryError.None);
         }
         (BatchEntry.Data[] memory entries, DecompressEntryError erCode) = decompress(proof.compressed);

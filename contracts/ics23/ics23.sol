@@ -32,7 +32,7 @@ library Ics23  {
         ExistenceProof.Data memory exiProof = getExistProofForKey(decoProof, key);
         //require(Ics23ExistenceProof.isNil(exiProof) == false); // dev: getExistProofForKey not available
         if (ExistenceProof.isNil(exiProof)) {
-            revert("ExistenceProof.isNil(exiProof)");
+            revert("ExistenceProof.isNil(exiProof)"); // todo
             return VerifyMembershipError.ExistenceProofIsNil;
         }
         Proof.VerifyExistenceError vCode = Proof.verify(exiProof, spec, commitmentRoot, key, value);
