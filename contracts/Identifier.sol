@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 //import "./types/Client.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@hyperledger-labs/yui-ibc-solidity/contracts/core/IBCHeight.sol";
 
 library Identifier {
@@ -37,10 +38,10 @@ library Identifier {
     }
 
     function packetCommitmentKey(string memory portId, string memory channelId, uint64 sequence) public pure returns (bytes memory) {
-        return abi.encodePacked(packetPrefix, "/", portPrefix, "/", portId, "/", channelPrefix, "/", channelId, "/", sequencePrefix, "/", sequence);
+        return abi.encodePacked(packetPrefix, "/", portPrefix, "/", portId, "/", channelPrefix, "/", channelId, "/", sequencePrefix, "/", Strings.toString(sequence));
     }
 
     function packetAcknowledgementCommitmentKey(string memory portId, string memory channelId, uint64 sequence) public pure returns (bytes memory) {
-        return abi.encodePacked(packetAckPrefix, "/", portPrefix, "/", portId, "/", channelPrefix, "/", channelId, "/", sequencePrefix, "/", sequence);
+        return abi.encodePacked(packetAckPrefix, "/", portPrefix, "/", portId, "/", channelPrefix, "/", channelId, "/", sequencePrefix, "/", Strings.toString(sequence));
     }
 }
